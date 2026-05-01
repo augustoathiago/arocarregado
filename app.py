@@ -238,36 +238,37 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
     )
 
     # =========================
-    # Rótulo vetorial CORRETO:
-    #  - E sozinho (sem caixa)
-    #  - seta pequena exatamente acima do E
-    #  - caixa do valor abaixo (separada)
+    # CAIXA DO CAMPO (UMA ÚNICA LINHA):
+    # "E = valor N/C" e seta acima do E (alinhada)
     # =========================
-    # Posição do rótulo perto de P, mas afastado do aro e dentro do quadro
-    e_x = clamp(x + 0.18*BASE, X_LEFT + 0.20*BASE, X_RIGHT - 0.45*BASE)
-    e_y = 0.38 * Y_LIM
+    # posição do rótulo (perto de P, afastado do aro e dentro do quadro)
+    box_x = clamp(x + 0.18*BASE, X_LEFT + 0.20*BASE, X_RIGHT - 0.55*BASE)
+    box_y = 0.38 * Y_LIM
 
-    # Letra E (sozinha)
+    # Texto em UMA LINHA dentro da caixa
     fig.add_annotation(
-        x=e_x, y=e_y,
-        text="<b>E</b>",
+        x=box_x, y=box_y,
+        text=f"<b>E</b> = {fmt_html_10(Ex, 'N/C', sig=3)}",
         showarrow=False,
-        font=dict(color="green", size=16),
         xanchor="left",
         yanchor="middle",
-        align="left"
+        align="left",
+        bgcolor="rgba(255,255,255,0.92)",
+        bordercolor="rgba(0,0,0,0.55)",
+        borderwidth=1,
+        font=dict(size=13, color="green")
     )
 
-    # Seta pequena EXATAMENTE acima do E
-    # (mesmo xanchor = left, então colocamos a seta centrada sobre a letra E)
-    # Ajuste fino: deslocamento horizontal pequeno para ficar acima da letra.
-    arrow_center_x = e_x + 0.03*BASE
-    arrow_y = e_y + 0.10*Y_LIM
-    small = 0.03 * BASE
+    # Seta pequena EXATAMENTE acima do "E"
+    # Como o texto está com xanchor="left", o "E" fica no início do texto.
+    # Ajuste fino: pequena translação em x para centralizar a seta sobre a letra E.
+    arrow_center_x = box_x + 0.028*BASE
+    arrow_y = box_y + 0.11*Y_LIM
+    half_len = 0.028 * BASE
 
     fig.add_annotation(
-        x=arrow_center_x + small, y=arrow_y,
-        ax=arrow_center_x - small, ay=arrow_y,
+        x=arrow_center_x + half_len, y=arrow_y,
+        ax=arrow_center_x - half_len, ay=arrow_y,
         xref="x", yref="y",
         axref="x", ayref="y",
         showarrow=True,
@@ -276,20 +277,6 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
         arrowwidth=2,
         arrowcolor="green",
         text=""
-    )
-
-    # Caixa do valor (abaixo do E, sem interferir na seta)
-    fig.add_annotation(
-        x=e_x, y=e_y - 0.12*Y_LIM,
-        text=f"= {fmt_html_10(Ex, 'N/C', sig=3)}",
-        showarrow=False,
-        xanchor="left",
-        yanchor="middle",
-        align="left",
-        bgcolor="rgba(255,255,255,0.92)",
-        bordercolor="rgba(0,0,0,0.55)",
-        borderwidth=1,
-        font=dict(size=12, color="green")
     )
 
     # =========================
@@ -363,7 +350,7 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
     )
 
     # =========================
-    # Caixa fixa com λ (paper coords) — sempre visível
+    # Caixa fixa com λ (paper coords)
     # =========================
     fig.add_annotation(
         x=0.02, y=0.98, xref="paper", yref="paper",
@@ -385,7 +372,6 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
         showlegend=False,
         dragmode="pan"
     )
-
     fig.update_xaxes(range=[X_LEFT, X_RIGHT], visible=False, fixedrange=False)
     fig.update_yaxes(range=[-Y_LIM, Y_LIM], visible=False, scaleanchor="x", scaleratio=1, fixedrange=True)
 
