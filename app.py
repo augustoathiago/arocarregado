@@ -166,7 +166,7 @@ X_LEFT, X_RIGHT = -0.85 * BASE, 2.10 * BASE
 Y_LIM = 1.25 * A_MAX
 
 def clamp(v, vmin, vmax):
-    return max(vmin, min(vmax, v))
+    return max(vmin, min(vmax, vmax if v > vmax else v))
 
 def make_scene_figure(x, a, lmbda, Q, Ex):
     # cor do aro
@@ -412,10 +412,9 @@ def curve_E_vs_x(a, Q):
     E = K * xs * Q / (a*a + xs*xs)**1.5
     return xs, E
 
-def curve_E_vs_a(x, lmbda):
+def curve_E_vs_a(x, Q):
     aas = np.linspace(A_MIN, A_MAX, 450)
-    Qs = lmbda * 2*np.pi*aas
-    E = K * x * Qs / (aas*aas + x*x)**1.5
+    E = K * x * Q / (aas*aas + x*x)**1.5
     return aas, E
 
 def curve_E_vs_Q(x, a):
@@ -447,7 +446,7 @@ def style_axes_black(fig):
     return fig
 
 xs, Es = curve_E_vs_x(a, Q)
-aas, Ea = curve_E_vs_a(x, lmbda)
+aas, Ea = curve_E_vs_a(x, Q)
 Qs, EQ = curve_E_vs_Q(x, a)
 
 max_abs = float(np.max(np.abs(np.concatenate([Es, Ea, EQ]))))
