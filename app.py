@@ -404,7 +404,7 @@ st.latex(r"L = 2\pi a")
 st.markdown("**Carga Q**")
 st.latex(r"Q = \lambda\,L = \lambda(2\pi a)")
 
-st.markdown("**Campo elétrico E_x**")
+st.markdown("**Campo elétrico Ex**")
 st.latex(r"E_x = \frac{1}{4\pi\varepsilon_0}\,\frac{x\,Q}{(a^2+x^2)^{3/2}}")
 st.latex(r"\frac{1}{4\pi\varepsilon_0} = 9,0\times10^9\ \text{N·m}^2/\text{C}^2")
 
@@ -422,7 +422,7 @@ st.latex(
     rf" = {fmt_latex_10(Q,'C',sig=4)}"
 )
 
-st.latex(rf"Ex = (9,0\times 10^9)\,\frac{{xQ}}{{(a^2+x^2)^{{3/2}}}}")
+st.latex(rf"E_x = (9,0\times 10^9)\,\frac{{xQ}}{{(a^2+x^2)^{{3/2}}}}")
 
 st.latex(
     rf"E_x = (9,0\times 10^9)\,\frac{{({fmt_dec_pt(x,3)})\left({fmt_latex_10(Q,'C',sig=4)}\right)}}"
@@ -430,7 +430,6 @@ st.latex(
 )
 
 st.latex(rf"E_x = {fmt_latex_10(Ex,'N/C',sig=4)}\quad {sentido_seta}")
-st.markdown(f"**Sentido do campo em P:** {sentido_texto} **{sentido_seta}**")
 
 st.divider()
 
