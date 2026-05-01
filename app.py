@@ -27,9 +27,7 @@ def sci_parts(val: float, sig: int = 3):
         return 0.0, 0
     exp = int(np.floor(np.log10(abs(val))))
     mant = val / (10 ** exp)
-    # arredonda mantissa para sig algarismos significativos
     mant = float(f"{mant:.{sig-1}f}")
-    # reajusta caso vire 10.0 por arredondamento
     if abs(mant) >= 10:
         mant /= 10
         exp += 1
@@ -46,7 +44,7 @@ def fmt_latex_10(val: float, unit: str = "", sig: int = 3):
     return f"{s}\\,\\text{{{unit}}}" if unit else s
 
 def fmt_html_10(val: float, unit: str = "", sig: int = 3):
-    """Formata em HTML com ×10<sup>n</sup>."""
+    """Formata em HTML com ×10<sup>n</sup> e vírgula decimal."""
     if val == 0:
         return f"0 {unit}".strip()
     mant, exp = sci_parts(val, sig=sig)
@@ -54,7 +52,7 @@ def fmt_html_10(val: float, unit: str = "", sig: int = 3):
     return f"{mant_str}×10<sup>{exp}</sup> {unit}".strip()
 
 def fmt_dec_pt(val: float, nd: int = 3):
-    """Decimal com vírgula (quando quiser números não científicos)."""
+    """Decimal com vírgula (para valores como x e a)."""
     return f"{val:.{nd}f}".replace(".", ",")
 
 
@@ -90,13 +88,15 @@ st.divider()
 # =========================
 st.subheader("Parâmetros")
 
-# Limites (x apenas positivo, conforme pedido)
-X_MIN, X_MAX = 0.01, 2.00     # m
+# x agora permite 0 (pedido 2) e apenas positivo (mantido)
+X_MIN, X_MAX = 0.00, 2.00     # m
 A_MIN, A_MAX = 0.05, 1.00     # m
 
-# Lambda: faixa maior e passo menor (muitos valores)
-L_MIN, L_MAX = -2.0e-5, 2.0e-5  # C/m
-L_STEP = 1.0e-7                # 401 passos -> responsivo, e muito mais que "3 valores"
+# Para evitar quantização/limitação com floats pequenos no slider,
+# usamos µC/m (microC/m) com passo fino -> muitos valores (pedido 1)
+# Depois convertemos para C/m.
+L_U_MIN, L_U_MAX = -20.0, 20.0     # µC/m  => (-20e-6 a 20e-6) C/m
+L_U_STEP = 0.1                      # 0,1 µC/m => 1e-7 C/m
 
 colp1, colp2, colp3 = st.columns(3)
 
@@ -105,8 +105,10 @@ with colp1:
                   value=0.40, step=0.01)
 
 with colp2:
-    lmbda = st.slider("Densidade linear λ (C/m)", min_value=float(L_MIN), max_value=float(L_MAX),
-                      value=2.0e-6, step=float(L_STEP), format="%.7f")
+    lmbda_u = st.slider("Densidade linear λ (µC/m)", min_value=float(L_U_MIN), max_value=float(L_U_MAX),
+                        value=2.0, step=float(L_U_STEP))
+    lmbda = lmbda_u * 1e-6  # converte para C/m
+    st.caption(f"λ = {fmt_html_10(lmbda, 'C/m', sig=3)}")
 
 with colp3:
     a = st.slider("Raio a (m)", min_value=float(A_MIN), max_value=float(A_MAX),
@@ -117,7 +119,7 @@ L = circumference(a)
 Q = total_charge(lmbda, a)
 Ex = field_on_axis(x, a, Q)
 
-# Sentido do campo (no eixo)
+# Sentido do campo (no eixo, com x>=0)
 if Ex > 0:
     sentido_seta = "→"
     sentido_texto = "para a direita"
@@ -135,9 +137,9 @@ st.divider()
 # =========================
 @st.cache_data(show_spinner=False)
 def compute_global_emax():
-    xs = np.linspace(X_MIN, X_MAX, 260)
+    xs = np.linspace(X_MIN, X_MAX if X_MAX > 0 else 1.0, 260)
     aas = np.linspace(A_MIN, A_MAX, 220)
-    lam_abs = max(abs(L_MIN), abs(L_MAX))
+    lam_abs = max(abs(L_U_MIN), abs(L_U_MAX)) * 1e-6
 
     X, A = np.meshgrid(xs, aas)
     Qg = lam_abs * 2*np.pi*A
@@ -153,7 +155,6 @@ E_MAX_GLOBAL = compute_global_emax()
 st.subheader("Imagem")
 
 # Janela fixa baseada nos limites máximos (não varia com sliders)
-# Aro fixo em x=0
 BASE = max(A_MAX, X_MAX)
 X_LEFT, X_RIGHT = -0.85 * BASE, 2.10 * BASE
 Y_LIM = 1.25 * A_MAX
@@ -192,7 +193,7 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
         showlegend=False
     ))
 
-    # Ponto P (apenas "P")
+    # Ponto P (texto "P")
     fig.add_trace(go.Scatter(
         x=[x], y=[0],
         mode="markers+text",
@@ -204,9 +205,8 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
     ))
 
     # =========================
-    # Vetor E em P (tamanho varia, mas sem vazar a janela fixa)
+    # Vetor E em P (tamanho varia; e com E⃗ na legenda - pedido 3)
     # =========================
-    # comprimento controlado por sqrt(|E|/Emax)
     max_arrow_len = 0.35 * (X_RIGHT - X_LEFT)
     min_arrow_len = 0.08 * (X_RIGHT - X_LEFT)
     frac = 0.0 if E_MAX_GLOBAL == 0 else min(1.0, abs(Ex) / E_MAX_GLOBAL)
@@ -214,7 +214,6 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
     dx = arrow_len if Ex >= 0 else -arrow_len
 
     x_end = x + dx
-    # evita ultrapassar borda
     x_end = max(X_LEFT + 0.03*(X_RIGHT-X_LEFT), min(X_RIGHT - 0.03*(X_RIGHT-X_LEFT), x_end))
 
     fig.add_annotation(
@@ -229,11 +228,11 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
         arrowcolor="green"
     )
 
-    # Texto do vetor E (valor) próximo ao vetor
+    # Texto do vetor (E⃗) + valor
     midx = (x + x_end) / 2
     fig.add_annotation(
         x=midx, y=0.15*Y_LIM,
-        text=f"E = {fmt_html_10(Ex, 'N/C', sig=3)}",
+        text=f"E⃗ = {fmt_html_10(Ex, 'N/C', sig=3)}",
         showarrow=False,
         font=dict(color="green", size=14),
         align="center"
@@ -247,25 +246,8 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
 
     # Cota x (dupla seta)
     y_dimx = -0.35 * Y_LIM
-    fig.add_annotation(
-        x=x, y=y_dimx,
-        ax=0, ay=y_dimx,
-        xref="x", yref="y",
-        axref="x", ayref="y",
-        showarrow=True,
-        arrowhead=3,
-        arrowsize=1.0,
-        arrowwidth=2,
-        arrowcolor="black"
-    )
-    fig.add_annotation(
-        x=(x/2), y=y_dimx - 0.06*Y_LIM,
-        text=f"x = {fmt_dec_pt(x, 3)} m",
-        showarrow=False,
-        font=dict(color="black", size=13)
-    )
 
-    # Linhas auxiliares (cota x)
+    # Linhas auxiliares
     fig.add_trace(go.Scatter(
         x=[0, 0], y=[0, y_dimx],
         mode="lines",
@@ -279,11 +261,9 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
         hoverinfo="skip", showlegend=False
     ))
 
-    # Cota a (vertical à esquerda do aro)
-    x_dima = -0.55 * BASE
     fig.add_annotation(
-        x=x_dima, y=a,
-        ax=x_dima, ay=0,
+        x=x, y=y_dimx,
+        ax=0, ay=y_dimx,
         xref="x", yref="y",
         axref="x", ayref="y",
         showarrow=True,
@@ -293,14 +273,16 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
         arrowcolor="black"
     )
     fig.add_annotation(
-        x=x_dima, y=a/2,
-        text=f"a = {fmt_dec_pt(a, 3)} m",
+        x=(x/2 if x > 0 else 0.08*BASE), y=y_dimx - 0.06*Y_LIM,
+        text=f"x = {fmt_dec_pt(x, 3)} m",
         showarrow=False,
-        font=dict(color="black", size=13),
-        textangle=-90
+        font=dict(color="black", size=13)
     )
 
-    # Linhas auxiliares (cota a)
+    # Cota a (vertical à esquerda do aro)
+    x_dima = -0.55 * BASE
+
+    # Linhas auxiliares
     fig.add_trace(go.Scatter(
         x=[0, x_dima], y=[0, 0],
         mode="lines",
@@ -314,7 +296,28 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
         hoverinfo="skip", showlegend=False
     ))
 
-    # Caixa de informação (λ, a, x, Q)
+    fig.add_annotation(
+        x=x_dima, y=a,
+        ax=x_dima, ay=0,
+        xref="x", yref="y",
+        axref="x", ayref="y",
+        showarrow=True,
+        arrowhead=3,
+        arrowsize=1.0,
+        arrowwidth=2,
+        arrowcolor="black"
+    )
+
+    # Texto do raio deslocado para o lado (pedido 4)
+    fig.add_annotation(
+        x=x_dima - 0.08*BASE, y=a/2,   # deslocamento lateral
+        text=f"a = {fmt_dec_pt(a, 3)} m",
+        showarrow=False,
+        font=dict(color="black", size=13),
+        textangle=-90
+    )
+
+    # Caixa de informação (λ, Q, a, x)
     info = (
         f"λ = {fmt_html_10(lmbda, 'C/m', sig=3)}<br>"
         f"Q = {fmt_html_10(Q, 'C', sig=3)}<br>"
@@ -340,7 +343,7 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
         plot_bgcolor="white",
         paper_bgcolor="white",
         showlegend=False,
-        dragmode="pan"  # permite "deslizar"
+        dragmode="pan"
     )
 
     # Escalas fixas (não mudam com sliders)
@@ -360,7 +363,7 @@ st.caption("📱 No celular: arraste a figura para os lados (pan) para ver tudo 
 st.divider()
 
 # =========================
-# Equações (com títulos pedidos)
+# Equações (com títulos)
 # =========================
 st.subheader("Equações")
 
@@ -377,7 +380,7 @@ st.latex(r"\frac{1}{4\pi\varepsilon_0} = 9,0\times10^9\ \text{N·m}^2/\text{C}^2
 st.divider()
 
 # =========================
-# Cálculos (com 10^n e seta final)
+# Cálculos (10^n + seta final)
 # =========================
 st.subheader("Cálculos")
 
@@ -395,9 +398,7 @@ st.latex(
     rf"{{\left(({fmt_dec_pt(a,3)})^2+({fmt_dec_pt(x,3)})^2\right)^{{3/2}}}}"
 )
 
-# Resultado + seta final (pedido 8)
 st.latex(rf"E_x = {fmt_latex_10(Ex,'N/C',sig=4)}\quad {sentido_seta}")
-
 st.markdown(f"**Sentido do campo em P:** {sentido_texto} **{sentido_seta}**")
 
 st.divider()
@@ -408,22 +409,20 @@ st.divider()
 st.subheader("Gráficos")
 
 def curve_E_vs_x(a, Q):
-    xs = np.linspace(X_MIN, X_MAX, 400)
+    xs = np.linspace(max(X_MIN, 0.0), X_MAX, 450)
     E = K * xs * Q / (a*a + xs*xs)**1.5
     return xs, E
 
 def curve_E_vs_a(x, lmbda):
-    aas = np.linspace(A_MIN, A_MAX, 400)
+    aas = np.linspace(A_MIN, A_MAX, 450)
     Qs = lmbda * 2*np.pi*aas
     E = K * x * Qs / (aas*aas + x*x)**1.5
     return aas, E
 
 def curve_E_vs_Q(x, a):
-    # varia Q diretamente (mantendo x e a fixos)
-    # limites coerentes com lambda max e a max (para faixa ampla)
-    Qmin = L_MIN * 2*np.pi*A_MAX
-    Qmax = L_MAX * 2*np.pi*A_MAX
-    Qs = np.linspace(Qmin, Qmax, 400)
+    Qmin = (L_U_MIN*1e-6) * 2*np.pi*A_MAX
+    Qmax = (L_U_MAX*1e-6) * 2*np.pi*A_MAX
+    Qs = np.linspace(Qmin, Qmax, 450)
     E = K * x * Qs / (a*a + x*x)**1.5
     return Qs, E
 
@@ -433,16 +432,25 @@ def style_axes_black(fig):
         tickfont=dict(color="black"),
         showline=True, linecolor="black",
         ticks="outside", tickcolor="black",
-        exponentformat="power"  # 10^n
+        exponentformat="power"
     )
     fig.update_yaxes(
         title_font=dict(color="black"),
         tickfont=dict(color="black"),
         showline=True, linecolor="black",
         ticks="outside", tickcolor="black",
-        exponentformat="power"  # 10^n
+        exponentformat="power"
     )
     return fig
+
+# Eixos fixos nos gráficos
+@st.cache_data(show_spinner=False)
+def q_axis_limits():
+    qmin = (L_U_MIN*1e-6) * 2*np.pi*A_MAX
+    qmax = (L_U_MAX*1e-6) * 2*np.pi*A_MAX
+    return float(qmin), float(qmax)
+
+Q_MIN_AXIS, Q_MAX_AXIS = q_axis_limits()
 
 gx1, gx2, gx3 = st.columns(3)
 
@@ -504,7 +512,7 @@ with gx3:
         paper_bgcolor="white",
         showlegend=False
     )
-    fig3.update_xaxes(title="Q (C)", range=[float(Qs.min()), float(Qs.max())], zeroline=True)
+    fig3.update_xaxes(title="Q (C)", range=[Q_MIN_AXIS, Q_MAX_AXIS], zeroline=True)
     fig3.update_yaxes(title="Eₓ (N/C)", range=[-E_MAX_GLOBAL, E_MAX_GLOBAL], zeroline=True)
     style_axes_black(fig3)
     st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
