@@ -1,5 +1,13 @@
 import numpy as np
-import -> float:import streamlit as st
+import streamlit as st
+import plotly.graph_objects as go
+
+# =========================
+# Constantes e Física
+# =========================
+K = 9.0e9  # 1/(4*pi*epsilon0) em N·m²/C²
+
+def circumference(a: float) -> float:
     return 2.0 * np.pi * a
 
 def total_charge(lmbda: float, a: float) -> float:
@@ -230,14 +238,17 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
     )
 
     # =========================
-    # Caixa do campo elétrico (UMA LINHA) — sem seta acima
+    # CAIXA DO CAMPO (UMA ÚNICA LINHA):
+    # "E = valor N/C" e seta acima do E (alinhada)
     # =========================
+    # posição do rótulo (perto de P, afastado do aro e dentro do quadro)
     box_x = clamp(x + 0.18*BASE, X_LEFT + 0.20*BASE, X_RIGHT - 0.55*BASE)
     box_y = 0.38 * Y_LIM
 
+    # Texto em UMA LINHA dentro da caixa
     fig.add_annotation(
         x=box_x, y=box_y,
-        text=f"<b style='color:green;'>E</b> <span style='color:green;'>= {fmt_html_10(Ex, 'N/C', sig=3)}</span>",
+        text=f"<b>E</b> = {fmt_html_10(Ex, 'N/C', sig=3)}",
         showarrow=False,
         xanchor="left",
         yanchor="middle",
@@ -512,11 +523,3 @@ with gx3:
     st.plotly_chart(fig3, use_container_width=True, config=PLOT_CFG_STATIC)
 
 st.caption("🔴 O ponto vermelho indica a situação atual. Escala vertical igual nos três gráficos e sem interação para não atrapalhar a rolagem no celular.")
-
-import plotly.graph_objects as go
-
-# =========================
-# Constantes e Física
-# =========================
-K = 9.0e9  # 1/(4*pi*epsilon0) em N·m²/C²
-
