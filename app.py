@@ -422,7 +422,7 @@ st.latex(
     rf" = {fmt_latex_10(Q,'C',sig=4)}"
 )
 
-st.latex(rf"E_x = (9,0\times 10^9)\,\frac{{xQ}}{{(a^2+x^2)^{{3/2}}}}")
+st.latex(rf"Ex = (9,0\times 10^9)\,\frac{{xQ}}{{(a^2+x^2)^{{3/2}}}}")
 
 st.latex(
     rf"E_x = (9,0\times 10^9)\,\frac{{({fmt_dec_pt(x,3)})\left({fmt_latex_10(Q,'C',sig=4)}\right)}}"
@@ -547,4 +547,4 @@ with gx3:
     style_axes_black(fig3)
     st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
 
-st.caption("🔴 O ponto vermelho indica a situação atual. A escala vertical é a mesma nos três gráficos e se ajusta automaticamente.")
+st.caption("🔴 O ponto vermelho indica a situação atual.")
