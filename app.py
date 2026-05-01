@@ -377,7 +377,7 @@ st.latex(r"L = 2\pi a")
 st.markdown("**Carga Q**")
 st.latex(r"Q = \lambda\,L = \lambda(2\pi a)")
 
-st.markdown("**Campo elétrico E_x**")
+st.markdown("**Campo elétrico Ex**")
 st.latex(r"E_x = \frac{1}{4\pi\varepsilon_0}\,\frac{x\,Q}{(a^2+x^2)^{3/2}}")
 st.latex(r"\frac{1}{4\pi\varepsilon_0} = 9,0\times10^9\ \text{N·m}^2/\text{C}^2")
 
@@ -522,4 +522,4 @@ with gx3:
     style_axes_black(fig3)
     st.plotly_chart(fig3, use_container_width=True, config=PLOT_CFG_STATIC)
 
-st.caption("🔴 O ponto vermelho indica a situação atual. Escala vertical igual nos três gráficos e sem interação para não atrapalhar a rolagem no celular.")
+st.caption("🔴 O ponto vermelho indica a situação atual.")
