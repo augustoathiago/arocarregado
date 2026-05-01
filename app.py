@@ -399,7 +399,6 @@ st.latex(
     rf"{{\left(({fmt_dec_pt(a,3)})^2+({fmt_dec_pt(x,3)})^2\right)^{{3/2}}}}"
 )
 st.latex(rf"E_x = {fmt_latex_10(Ex,'N/C',sig=4)}\quad {sentido_seta}")
-st.markdown(f"**Sentido do campo em P:** {sentido_texto} **{sentido_seta}**")
 
 st.divider()
 
