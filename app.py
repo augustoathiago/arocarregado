@@ -60,16 +60,17 @@ st.set_page_config(
     layout="wide"
 )
 
-# CSS responsivo para celular (gráficos menores no mobile)
+# CSS responsivo: evita cortar eixos e ajusta altura no celular
 st.markdown(
     """
     <style>
-    /* Reduz altura dos gráficos no celular */
+    /* Melhorar layout no celular (evitar cortes) */
     @media (max-width: 768px){
+      /* dá mais "respiro" vertical para não cortar eixos */
       div[data-testid="stPlotlyChart"] iframe,
       div[data-testid="stPlotlyChart"] > div {
-        height: 300px !important;
-        min-height: 300px !important;
+        height: 360px !important;
+        min-height: 360px !important;
       }
     }
     </style>
@@ -101,12 +102,11 @@ st.divider()
 # =========================
 st.subheader("Parâmetros")
 
-# x agora permite 0 (pedido)
-X_MIN, X_MAX = 0.00, 2.00     # m (apenas positivo)
+# x permite 0 e apenas positivo
+X_MIN, X_MAX = 0.00, 2.00     # m
 A_MIN, A_MAX = 0.05, 1.00     # m
 
-# λ: para evitar “travamento”/quantização, usamos µC/m com passo fino (muitos valores)
-# Não exibimos legenda extra abaixo do slider (pedido 1).
+# λ em µC/m (muitos valores), sem indicador extra abaixo
 L_U_MIN, L_U_MAX = -20.0, 20.0  # µC/m => [-20e-6, 20e-6] C/m
 L_U_STEP = 0.1                  # 0,1 µC/m => 1e-7 C/m
 
@@ -119,18 +119,18 @@ with colp1:
 with colp2:
     lmbda_u = st.slider("Densidade linear λ (µC/m)", min_value=float(L_U_MIN), max_value=float(L_U_MAX),
                         value=2.0, step=float(L_U_STEP))
-    lmbda = lmbda_u * 1e-6  # converte para C/m
+    lmbda = lmbda_u * 1e-6  # C/m
 
 with colp3:
     a = st.slider("Raio a (m)", min_value=float(A_MIN), max_value=float(A_MAX),
                   value=0.25, step=0.01)
 
-# Cálculos principais
+# Cálculos
 L = circumference(a)
 Q = total_charge(lmbda, a)
 Ex = field_on_axis(x, a, Q)
 
-# Sentido do campo (no eixo, x>=0)
+# Sentido
 if Ex > 0:
     sentido_seta = "→"
     sentido_texto = "para a direita"
@@ -144,14 +144,13 @@ else:
 st.divider()
 
 # =========================
-# Emax global (para escala de seta e eixos)
+# Emax global (para seta na imagem)
 # =========================
 @st.cache_data(show_spinner=False)
 def compute_global_emax_for_scene():
     xs = np.linspace(X_MIN, X_MAX, 260)
     aas = np.linspace(A_MIN, A_MAX, 220)
     lam_abs = max(abs(L_U_MIN), abs(L_U_MAX)) * 1e-6
-
     X, A = np.meshgrid(xs, aas)
     Qg = lam_abs * 2*np.pi*A
     E = K * X * Qg / (A*A + X*X)**1.5
@@ -159,9 +158,8 @@ def compute_global_emax_for_scene():
 
 E_MAX_SCENE = compute_global_emax_for_scene()
 
-
 # =========================
-# Imagem (escala fixa + cotas) + orientação acima
+# Imagem (melhor no celular)
 # =========================
 st.subheader("Imagem")
 st.caption("📱 No celular: arraste a figura para os lados (pan) para ver tudo sem perder detalhes.")
@@ -217,9 +215,10 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
     ))
 
     # =========================
-    # Vetor E em P: seta verde + rótulo E com seta desenhada acima (robusto)
+    # Vetor E em P (sem sobreposição)
+    # Colocamos o rótulo acima do ponto P, com fonte menor
     # =========================
-    max_arrow_len = 0.35 * (X_RIGHT - X_LEFT)
+    max_arrow_len = 0.32 * (X_RIGHT - X_LEFT)
     min_arrow_len = 0.08 * (X_RIGHT - X_LEFT)
     frac = 0.0 if E_MAX_SCENE == 0 else min(1.0, abs(Ex) / E_MAX_SCENE)
     arrow_len = min_arrow_len + (max_arrow_len - min_arrow_len) * np.sqrt(frac)
@@ -228,7 +227,7 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
     x_end = x + dx
     x_end = max(X_LEFT + 0.03*(X_RIGHT-X_LEFT), min(X_RIGHT - 0.03*(X_RIGHT-X_LEFT), x_end))
 
-    # seta principal do campo
+    # seta do campo
     fig.add_annotation(
         x=x_end, y=0,
         ax=x, ay=0,
@@ -236,50 +235,52 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
         axref="x", ayref="y",
         showarrow=True,
         arrowhead=3,
-        arrowsize=1.2,
+        arrowsize=1.1,
         arrowwidth=4,
         arrowcolor="green"
     )
 
-    # rótulo E e valor
-    midx = (x + x_end) / 2
-    label_y = 0.18 * Y_LIM
+    # Rótulo "E" + seta pequena acima + valor, tudo acima de P
+    label_x = x + 0.18*BASE  # desloca para direita para não ficar em cima do aro
+    # garante que não saia da janela
+    label_x = min(label_x, X_RIGHT - 0.35*BASE)
+    label_y = 0.26 * Y_LIM   # mais alto para evitar cruzar o eixo/cotas
 
-    # "E" (letra)
+    # letra E
     fig.add_annotation(
-        x=midx, y=label_y,
+        x=label_x, y=label_y,
         text="E",
         showarrow=False,
-        font=dict(color="green", size=16),
+        font=dict(color="green", size=14),
         align="center"
     )
 
-    # seta pequena ACIMA do "E" (para indicar vetor)
-    small_arrow_half = 0.035 * BASE
+    # seta pequena acima de E
+    small = 0.03 * BASE
     fig.add_annotation(
-        x=midx + small_arrow_half, y=label_y + 0.06*Y_LIM,
-        ax=midx - small_arrow_half, ay=label_y + 0.06*Y_LIM,
+        x=label_x + small, y=label_y + 0.06*Y_LIM,
+        ax=label_x - small, ay=label_y + 0.06*Y_LIM,
         xref="x", yref="y",
         axref="x", ayref="y",
         showarrow=True,
         arrowhead=2,
-        arrowsize=1.0,
+        arrowsize=0.9,
         arrowwidth=2,
         arrowcolor="green",
         text=""
     )
 
-    # "= valor"
+    # valor do campo (em uma linha separada, menor, para ficar legível)
     fig.add_annotation(
-        x=midx + 0.17*BASE, y=label_y,
+        x=label_x + 0.14*BASE, y=label_y,
         text=f"= {fmt_html_10(Ex, 'N/C', sig=3)}",
         showarrow=False,
-        font=dict(color="green", size=14),
+        font=dict(color="green", size=12),
         align="left"
     )
 
     # =========================
-    # COTAS
+    # Cotas (x e a)
     # =========================
     # Cota x
     y_dimx = -0.35 * Y_LIM
@@ -314,7 +315,7 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
         x=(x/2 if x > 0 else 0.08*BASE), y=y_dimx - 0.06*Y_LIM,
         text=f"x = {fmt_dec_pt(x, 3)} m",
         showarrow=False,
-        font=dict(color="black", size=13)
+        font=dict(color="black", size=12)
     )
 
     # Cota a
@@ -346,31 +347,30 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
         text=""
     )
 
-    # texto do raio deslocado para não sobrepor a cota
+    # texto do raio deslocado mais para a esquerda (evita colisão)
     fig.add_annotation(
-        x=x_dima - 0.10*BASE, y=a/2,
+        x=x_dima - 0.12*BASE, y=a/2,
         text=f"a = {fmt_dec_pt(a, 3)} m",
         showarrow=False,
-        font=dict(color="black", size=13),
+        font=dict(color="black", size=12),
         textangle=-90
     )
 
-    # Caixa de informação (SEM Q, pedido 4)
-    info = (
-        f"λ = {fmt_html_10(lmbda, 'C/m', sig=3)}<br>"
-        f"a = {fmt_dec_pt(a, 3)} m<br>"
-        f"x = {fmt_dec_pt(x, 3)} m"
-    )
+    # =========================
+    # Caixa de informação: apenas λ (pedido 2)
+    # reposicionada para não invadir a cota de a
+    # =========================
+    info = f"λ = {fmt_html_10(lmbda, 'C/m', sig=3)}"
     fig.add_annotation(
         x=X_LEFT + 0.02*(X_RIGHT-X_LEFT),
-        y=Y_LIM - 0.05*(2*Y_LIM),
+        y=Y_LIM - 0.02*(2*Y_LIM),
         text=info,
         showarrow=False,
         align="left",
         bordercolor="black",
         borderwidth=1,
         bgcolor="white",
-        font=dict(size=13, color="black")
+        font=dict(size=12, color="black")
     )
 
     # Layout
@@ -380,16 +380,23 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
         plot_bgcolor="white",
         paper_bgcolor="white",
         showlegend=False,
-        dragmode="pan"
+        dragmode="pan"  # mantém pan (sem zoom)
     )
 
+    # Fixar escala e impedir "zoom" acidental por gesto
     fig.update_xaxes(range=[X_LEFT, X_RIGHT], visible=False, fixedrange=False)
-    fig.update_yaxes(range=[-Y_LIM, Y_LIM], visible=False, scaleanchor="x", scaleratio=1, fixedrange=False)
+    fig.update_yaxes(range=[-Y_LIM, Y_LIM], visible=False, scaleanchor="x", scaleratio=1, fixedrange=True)
 
     return fig
 
 scene = make_scene_figure(x, a, lmbda, Q, Ex)
-st.plotly_chart(scene, use_container_width=True, config={"scrollZoom": True, "displayModeBar": False})
+
+# Para a imagem: sem scrollZoom (evita zoom acidental), mas com pan.
+st.plotly_chart(
+    scene,
+    use_container_width=True,
+    config={"scrollZoom": False, "displayModeBar": False, "responsive": True}
+)
 
 st.divider()
 
@@ -404,14 +411,14 @@ st.latex(r"L = 2\pi a")
 st.markdown("**Carga Q**")
 st.latex(r"Q = \lambda\,L = \lambda(2\pi a)")
 
-st.markdown("**Campo elétrico Ex**")
+st.markdown("**Campo elétrico E_x**")
 st.latex(r"E_x = \frac{1}{4\pi\varepsilon_0}\,\frac{x\,Q}{(a^2+x^2)^{3/2}}")
 st.latex(r"\frac{1}{4\pi\varepsilon_0} = 9,0\times10^9\ \text{N·m}^2/\text{C}^2")
 
 st.divider()
 
 # =========================
-# Cálculos (seta final)
+# Cálculos
 # =========================
 st.subheader("Cálculos")
 
@@ -430,12 +437,12 @@ st.latex(
 )
 
 st.latex(rf"E_x = {fmt_latex_10(Ex,'N/C',sig=4)}\quad {sentido_seta}")
+st.markdown(f"**Sentido do campo em P:** {sentido_texto} **{sentido_seta}**")
 
 st.divider()
 
 # =========================
-# Gráficos
-# - Eixo Y auto-ajustado (preenche) e igual nos 3 gráficos (pedido 3)
+# Gráficos (sem interação + não cortar eixos)
 # =========================
 st.subheader("Gráficos")
 
@@ -463,14 +470,18 @@ def style_axes_black(fig):
         tickfont=dict(color="black"),
         showline=True, linecolor="black",
         ticks="outside", tickcolor="black",
-        exponentformat="power"
+        exponentformat="power",
+        automargin=True,
+        fixedrange=True
     )
     fig.update_yaxes(
         title_font=dict(color="black"),
         tickfont=dict(color="black"),
         showline=True, linecolor="black",
         ticks="outside", tickcolor="black",
-        exponentformat="power"
+        exponentformat="power",
+        automargin=True,
+        fixedrange=True
     )
     return fig
 
@@ -479,17 +490,23 @@ xs, Es = curve_E_vs_x(a, Q)
 aas, Ea = curve_E_vs_a(x, lmbda)
 Qs, EQ = curve_E_vs_Q(x, a)
 
-# Escala Y: calcula o maior |E| considerando os 3 gráficos e usa a mesma nos três
+# Escala Y igual nos 3 e ajustada (preenche espaço)
 max_abs = float(np.max(np.abs(np.concatenate([Es, Ea, EQ]))))
 if max_abs == 0:
-    max_abs = 1.0  # evita range nulo quando tudo é zero
+    max_abs = 1.0
 YMAX = 1.08 * max_abs
 
-# Limites de Q fixos (para o eixo X do gráfico 3)
 Q_MIN_AXIS = float((L_U_MIN*1e-6) * 2*np.pi*A_MAX)
 Q_MAX_AXIS = float((L_U_MAX*1e-6) * 2*np.pi*A_MAX)
 
-# Layout: no desktop 3 colunas; no celular empilha automaticamente
+# Config para bloquear interação (pedido 3)
+PLOT_CFG_STATIC = {
+    "staticPlot": True,       # trava tudo (sem zoom/pan)
+    "displayModeBar": False,
+    "scrollZoom": False,
+    "responsive": True
+}
+
 gx1, gx2, gx3 = st.columns(3)
 
 with gx1:
@@ -499,8 +516,8 @@ with gx1:
     fig1.update_layout(
         title="Campo elétrico em função da distância x",
         title_font=dict(color="black"),
-        height=360,
-        margin=dict(l=10, r=10, t=55, b=10),
+        height=380,
+        margin=dict(l=55, r=15, t=60, b=70),  # b maior para não cortar eixo no celular
         plot_bgcolor="white",
         paper_bgcolor="white",
         showlegend=False
@@ -508,7 +525,7 @@ with gx1:
     fig1.update_xaxes(title="x (m)", range=[X_MIN, X_MAX], zeroline=True)
     fig1.update_yaxes(title="Eₓ (N/C)", range=[-YMAX, YMAX], zeroline=True)
     style_axes_black(fig1)
-    st.plotly_chart(fig1, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig1, use_container_width=True, config=PLOT_CFG_STATIC)
 
 with gx2:
     fig2 = go.Figure()
@@ -517,8 +534,8 @@ with gx2:
     fig2.update_layout(
         title="Campo elétrico em função do raio a",
         title_font=dict(color="black"),
-        height=360,
-        margin=dict(l=10, r=10, t=55, b=10),
+        height=380,
+        margin=dict(l=55, r=15, t=60, b=70),
         plot_bgcolor="white",
         paper_bgcolor="white",
         showlegend=False
@@ -526,7 +543,7 @@ with gx2:
     fig2.update_xaxes(title="a (m)", range=[A_MIN, A_MAX], zeroline=True)
     fig2.update_yaxes(title="Eₓ (N/C)", range=[-YMAX, YMAX], zeroline=True)
     style_axes_black(fig2)
-    st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig2, use_container_width=True, config=PLOT_CFG_STATIC)
 
 with gx3:
     fig3 = go.Figure()
@@ -535,8 +552,8 @@ with gx3:
     fig3.update_layout(
         title="Campo elétrico em função da carga total Q",
         title_font=dict(color="black"),
-        height=360,
-        margin=dict(l=10, r=10, t=55, b=10),
+        height=380,
+        margin=dict(l=55, r=15, t=60, b=70),
         plot_bgcolor="white",
         paper_bgcolor="white",
         showlegend=False
@@ -544,6 +561,6 @@ with gx3:
     fig3.update_xaxes(title="Q (C)", range=[Q_MIN_AXIS, Q_MAX_AXIS], zeroline=True)
     fig3.update_yaxes(title="Eₓ (N/C)", range=[-YMAX, YMAX], zeroline=True)
     style_axes_black(fig3)
-    st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(fig3, use_container_width=True, config=PLOT_CFG_STATIC)
 
-st.caption("🔴 O ponto vermelho indica a situação atual.")
+st.caption("🔴 O ponto vermelho indica a situação atual. Escala vertical igual nos três gráficos e sem interação para não atrapalhar a rolagem no celular.")
