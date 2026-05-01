@@ -60,12 +60,11 @@ st.set_page_config(
     layout="wide"
 )
 
-# CSS responsivo: aumenta altura no celular para não cortar eixos
+# CSS responsivo: gráficos mais altos no celular (evita cortar eixo X)
 st.markdown(
     """
     <style>
     @media (max-width: 768px){
-      /* Gráficos mais altos no celular */
       div[data-testid="stPlotlyChart"] iframe,
       div[data-testid="stPlotlyChart"] > div {
         height: 440px !important;
@@ -105,8 +104,8 @@ X_MIN, X_MAX = 0.00, 2.00     # m (x >= 0)
 A_MIN, A_MAX = 0.05, 1.00     # m
 
 # λ em µC/m (muitos valores)
-L_U_MIN, L_U_MAX = -20.0, 20.0   # µC/m
-L_U_STEP = 0.1                   # 0,1 µC/m -> 1e-7 C/m
+L_U_MIN, L_U_MAX = -20.0, 20.0
+L_U_STEP = 0.1
 
 colp1, colp2, colp3 = st.columns(3)
 
@@ -166,7 +165,11 @@ BASE = max(A_MAX, X_MAX)
 X_LEFT, X_RIGHT = -0.85 * BASE, 2.10 * BASE
 Y_LIM = 1.25 * A_MAX
 
+def clamp(v, vmin, vmax):
+    return max(vmin, min(vmax, v))
+
 def make_scene_figure(x, a, lmbda, Q, Ex):
+    # cor do aro
     if Q > 0:
         ring_color = "red"
     elif Q < 0:
@@ -211,7 +214,7 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
     ))
 
     # =========================
-    # Vetor E (seta) + rótulo limpo (sem sobrepor)
+    # Vetor E (seta principal)
     # =========================
     max_arrow_len = 0.32 * (X_RIGHT - X_LEFT)
     min_arrow_len = 0.08 * (X_RIGHT - X_LEFT)
@@ -220,9 +223,8 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
     dx = arrow_len if Ex >= 0 else -arrow_len
 
     x_end = x + dx
-    x_end = max(X_LEFT + 0.03*(X_RIGHT-X_LEFT), min(X_RIGHT - 0.03*(X_RIGHT-X_LEFT), x_end))
+    x_end = clamp(x_end, X_LEFT + 0.03*(X_RIGHT-X_LEFT), X_RIGHT - 0.03*(X_RIGHT-X_LEFT))
 
-    # seta do campo
     fig.add_annotation(
         x=x_end, y=0,
         ax=x, ay=0,
@@ -235,28 +237,37 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
         arrowcolor="green"
     )
 
-    # Bloco de texto: E e valor em duas linhas (muito mais legível no celular)
-    # Posiciona acima do P e um pouco à direita
-    label_x = min(x + 0.22*BASE, X_RIGHT - 0.40*BASE)
-    label_y = 0.33 * Y_LIM
+    # =========================
+    # Rótulo vetorial CORRETO:
+    #  - E sozinho (sem caixa)
+    #  - seta pequena exatamente acima do E
+    #  - caixa do valor abaixo (separada)
+    # =========================
+    # Posição do rótulo perto de P, mas afastado do aro e dentro do quadro
+    e_x = clamp(x + 0.18*BASE, X_LEFT + 0.20*BASE, X_RIGHT - 0.45*BASE)
+    e_y = 0.38 * Y_LIM
 
+    # Letra E (sozinha)
     fig.add_annotation(
-        x=label_x, y=label_y,
-        text=f"<span style='color:green; font-weight:700;'>E</span><br>"
-             f"<span style='color:green;'>= {fmt_html_10(Ex, 'N/C', sig=3)}</span>",
+        x=e_x, y=e_y,
+        text="<b>E</b>",
         showarrow=False,
-        align="left",
-        bgcolor="rgba(255,255,255,0.85)",
-        bordercolor="rgba(0,0,0,0.55)",
-        borderwidth=1,
-        font=dict(size=12, color="green")
+        font=dict(color="green", size=16),
+        xanchor="left",
+        yanchor="middle",
+        align="left"
     )
 
-    # seta pequena acima do "E" (vetor) — separada, com espaçamento maior
+    # Seta pequena EXATAMENTE acima do E
+    # (mesmo xanchor = left, então colocamos a seta centrada sobre a letra E)
+    # Ajuste fino: deslocamento horizontal pequeno para ficar acima da letra.
+    arrow_center_x = e_x + 0.03*BASE
+    arrow_y = e_y + 0.10*Y_LIM
     small = 0.03 * BASE
+
     fig.add_annotation(
-        x=label_x + small, y=label_y + 0.14*Y_LIM,
-        ax=label_x - small, ay=label_y + 0.14*Y_LIM,
+        x=arrow_center_x + small, y=arrow_y,
+        ax=arrow_center_x - small, ay=arrow_y,
         xref="x", yref="y",
         axref="x", ayref="y",
         showarrow=True,
@@ -265,6 +276,20 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
         arrowwidth=2,
         arrowcolor="green",
         text=""
+    )
+
+    # Caixa do valor (abaixo do E, sem interferir na seta)
+    fig.add_annotation(
+        x=e_x, y=e_y - 0.12*Y_LIM,
+        text=f"= {fmt_html_10(Ex, 'N/C', sig=3)}",
+        showarrow=False,
+        xanchor="left",
+        yanchor="middle",
+        align="left",
+        bgcolor="rgba(255,255,255,0.92)",
+        bordercolor="rgba(0,0,0,0.55)",
+        borderwidth=1,
+        font=dict(size=12, color="green")
     )
 
     # =========================
@@ -338,7 +363,7 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
     )
 
     # =========================
-    # Caixa fixa com λ (paper coords) — sempre visível no celular
+    # Caixa fixa com λ (paper coords) — sempre visível
     # =========================
     fig.add_annotation(
         x=0.02, y=0.98, xref="paper", yref="paper",
@@ -351,7 +376,7 @@ def make_scene_figure(x, a, lmbda, Q, Ex):
         font=dict(size=12, color="black")
     )
 
-    # Layout: pan habilitado; sem zoom por scroll
+    # Layout
     fig.update_layout(
         height=460,
         margin=dict(l=10, r=10, t=10, b=10),
@@ -413,7 +438,7 @@ st.markdown(f"**Sentido do campo em P:** {sentido_texto} **{sentido_seta}**")
 st.divider()
 
 # =========================
-# Gráficos (mais altos + margem inferior maior)
+# Gráficos
 # =========================
 st.subheader("Gráficos")
 
@@ -456,12 +481,10 @@ def style_axes_black(fig):
     )
     return fig
 
-# Curvas atuais
 xs, Es = curve_E_vs_x(a, Q)
 aas, Ea = curve_E_vs_a(x, lmbda)
 Qs, EQ = curve_E_vs_Q(x, a)
 
-# Escala Y igual nos 3 e ajustada
 max_abs = float(np.max(np.abs(np.concatenate([Es, Ea, EQ]))))
 if max_abs == 0:
     max_abs = 1.0
@@ -470,7 +493,6 @@ YMAX = 1.08 * max_abs
 Q_MIN_AXIS = float((L_U_MIN*1e-6) * 2*np.pi*A_MAX)
 Q_MAX_AXIS = float((L_U_MAX*1e-6) * 2*np.pi*A_MAX)
 
-# Sem interação (não atrapalha rolagem)
 PLOT_CFG_STATIC = {
     "staticPlot": True,
     "displayModeBar": False,
@@ -488,7 +510,7 @@ with gx1:
         title="Campo elétrico em função da distância x",
         title_font=dict(color="black"),
         height=430,
-        margin=dict(l=60, r=18, t=65, b=95),  # b maior para não cortar o título do eixo X
+        margin=dict(l=60, r=18, t=65, b=95),
         plot_bgcolor="white",
         paper_bgcolor="white",
         showlegend=False
